@@ -9,7 +9,7 @@ DHT dht(DHTPIN, DHTTYPE);
 HX711 scale(7, 8);
 
 char msg[50];
-float calibration_factor = 346547;
+float calibration_factor = 286547;
 char str_gram[10];
 int lastMsg;
 char str_cels[5];

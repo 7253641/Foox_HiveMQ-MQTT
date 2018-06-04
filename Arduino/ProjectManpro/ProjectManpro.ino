@@ -1,107 +1,55 @@
-#include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include "HX711.h"
+#include "DHT.h"
+#include <Wire.h>
 
-// Update these with values suitable for your network.
+#define DHTPIN 6
+#define DHTTYPE DHT22
 
-const char* ssid = "HEHEHEHEHE";
-const char* password = "ahmabalu";
-const char* mqtt_server = "broker.hivemq.com";
+DHT dht(DHTPIN, DHTTYPE);
+HX711 scale(7, 8);
 
-WiFiClient espClient;
-PubSubClient client(espClient);
-long lastMsg = 0;
 char msg[50];
-int value = 0;
-
-void setup_wifi() {
-
-  delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  randomSeed(micros());
-
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-}
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
-    // but actually the LED is on; this is because
-    // it is acive low on the ESP-01)
-  } else {
-    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
-  }
-
-}
-
-void reconnect() {
-  // Loop until we're reconnected
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Create a random client ID
-    String clientId = "ESP8266Client-";
-    clientId += String(random(0xffff), HEX);
-    // Attempt to connect
-    if (client.connect(clientId.c_str())) {
-      Serial.println("connected");
-      // Once connected, publish an announcement...
-      client.publish("outTopic", "hello world");
-      // ... and resubscribe
-      client.subscribe("manprotesting");
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
-  }
-}
+float calibration_factor = 346547;
+char str_gram[10];
+int lastMsg;
+char str_cels[5];
+float weight;
+char str_hum[5];
+String valueString;
+float h,t;
 
 void setup() {
-  pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
-  Serial.begin(115200);
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
+  Serial.begin(9600);
+  Wire.begin(8);                /* join i2c bus with address 8 */
+  Wire.onRequest(requestEvent); /* register request event */
+  scale.set_scale();
+  scale.tare(); //Reset the scale to 0
 }
 
 void loop() {
-
-  if (!client.connected()) {
-    reconnect();
+  scale.set_scale(calibration_factor);
+  weight = scale.get_units(3);
+  h = dht.readHumidity();
+  t = dht.readTemperature();
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
   }
-  client.loop();
+  if (weight < 0) weight = 0;
+  Serial.println("Publish message: ");
+  dtostrf(h, 3, 1, str_hum);
+  dtostrf(t, 3, 1, str_cels);
+  dtostrf(weight, 4, 3, str_gram);
+  snprintf(msg, 75, "{\"hum\":%s,\"temp\":%s,\"gram\":%s}", str_hum, str_cels, str_gram);
+  Serial.println(str_hum);
+  Serial.println(str_cels);
+  Serial.println(str_gram);
+  Serial.println(msg);
+  delay(100);
+}
 
-  long now = millis();
-  if (now - lastMsg > 2000) {
-    lastMsg = now;
-    ++value;
-    snprintf (msg, 75, "{'temp':80,'hum':80}");
-    Serial.print("Publish message: ");
-    Serial.println(msg);
-    client.publish("testmanprofoox", msg);
-  }
+// function that executes whenever data is requested from master
+void requestEvent() {
+  Serial.print("requested");
 }

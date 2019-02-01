@@ -11,7 +11,9 @@ case "$PILIHAN" in
 	   git remote add origin https://github.com/faderosyad/Foox_HiveMQ-MQTT.git
 		;;
 	2) git add *
-	   git commit -m "Update from bash"
+	echo "Masukkan pesan update:"
+	read MESSAGE
+	   git commit -m "$MESSAGE"
 	   git remote add origin https://github.com/faderosyad/Foox_HiveMQ-MQTT.git
 	   git push -u origin master
 	   ;;
